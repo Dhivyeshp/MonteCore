@@ -11,4 +11,6 @@ def save_data(df, symbol):
     df.to_csv(f'data/{symbol}.csv')
 
 def load_data(symbol):
-    return pd.read_csv(f'data/{symbol}.csv', index_col=0, parse_dates=True)
+    df = pd.read_csv(f'data/{symbol}.csv', index_col=0, parse_dates=True)
+    df['Close'] = pd.to_numeric(df['Close'], errors='coerce')
+    return df
