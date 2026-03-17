@@ -3,6 +3,7 @@ from strategies.moving_average import generate_signals
 from engine.backtester import run_backtest
 from metrics.performance import compute_sharpe, compute_drawdown, compute_total_return
 from monte_carlo.simulator import run_simulation
+import matplotlib.pyplot as plt
 
 symbol = 'AAPL'
 start = '2020-01-01'
@@ -30,4 +31,19 @@ print('Total Return:', compute_total_return(equity))
 
 # Step 6: Monte Carlo simulation (optional)
 simulations = run_simulation(returns)
+# Plot a few Monte Carlo simulation paths
+plt.figure(figsize=(12, 6))
+simulations.iloc[:, :10].plot(legend=False, alpha=0.7, title='Monte Carlo Simulated Equity Curves')
+plt.xlabel('Day')
+plt.ylabel('Portfolio Value')
+plt.grid(True)
+plt.show()
 print('Monte Carlo simulation shape:', simulations.shape)
+
+# Step 7: Plot the equity curve
+plt.figure(figsize=(12, 6))
+df['Equity_Curve'].plot(title='Equity Curve')
+plt.xlabel('Date')
+plt.ylabel('Portfolio Value')
+plt.grid(True)
+plt.show()
