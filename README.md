@@ -1,4 +1,5 @@
 # monteCore — Quant Trading Backtesting + Monte Carlo Engine
+<img width="949" height="479" alt="image" src="https://github.com/user-attachments/assets/846c2d71-47fb-4ff5-b8db-498ea66f9d55" />
 
 ## Overview
 
