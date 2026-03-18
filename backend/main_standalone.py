@@ -5,18 +5,6 @@ from metrics.performance import compute_sharpe, compute_drawdown, compute_total_
 from monte_carlo.simulator import run_simulation
 import matplotlib.pyplot as plt
 
-from fastapi.middleware.cors import CORSMiddleware
-
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Or specify ["http://localhost:3000"]
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 symbol = 'NVDA'
 start = '2020-01-01'
 end = '2023-01-01'
