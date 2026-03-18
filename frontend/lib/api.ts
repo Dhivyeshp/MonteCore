@@ -8,6 +8,8 @@ interface BacktestParams {
   slippage: number;
 }
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
+
 function buildBody(params: BacktestParams, nSims: number) {
   return JSON.stringify({
     symbol:        params.ticker,
@@ -21,7 +23,7 @@ function buildBody(params: BacktestParams, nSims: number) {
 
 /** Full backtest + initial MC run (100 sims). Returns equity curve, metrics, and MC data. */
 export async function runBacktest(params: BacktestParams, signal?: AbortSignal) {
-  const res = await fetch('http://localhost:8000/backtest', {
+  const res = await fetch(`${API_URL}/backtest`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: buildBody(params, 100),   // stage 1 always starts at 100
@@ -33,7 +35,7 @@ export async function runBacktest(params: BacktestParams, signal?: AbortSignal) 
 
 /** MC-only progressive update — no equity curve in response, faster for stages 2-4. */
 export async function runSimulate(params: BacktestParams, nSims: number, signal?: AbortSignal) {
-  const res = await fetch('http://localhost:8000/simulate', {
+  const res = await fetch(`${API_URL}/simulate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: buildBody(params, nSims),
