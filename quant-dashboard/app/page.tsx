@@ -1,12 +1,15 @@
 "use client";
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import Sidebar from '../components/Sidebar';
 import MetricsBar from '../components/MetricsBar';
 import ControlPanel from '../components/ControlPanel';
 import ChartCard from '../components/ChartCard';
 import MonteCarloPanel from '../components/MonteCarloPanel';
 import MonteCarloChart from '../components/MonteCarloChart';
-import { runBacktest } from '../lib/api';
+import { runBacktest, runSimulate } from '../lib/api';
+
+// Stages: 100 → 500 → 1000 → 5000
+const MC_STAGES = [500, 1000, 5000] as const;
 
 type Metrics = {
   portfolio_value: number;
@@ -37,16 +40,20 @@ type Params = {
 };
 
 export default function DashboardPage() {
-  const [metrics, setMetrics] = useState<Metrics>(defaultMetrics);
-  const [equityCurve, setEquityCurve] = useState<{ date: string; value: number }[]>([]);
-  const [returns, setReturns] = useState<{ date: string; value: number }[]>([]);
+  const [metrics, setMetrics]           = useState<Metrics>(defaultMetrics);
+  const [equityCurve, setEquityCurve]   = useState<{ date: string; value: number }[]>([]);
+  const [returns, setReturns]           = useState<{ date: string; value: number }[]>([]);
   const [simulations, setSimulations]   = useState<any[]>([]);
   const [mcPaths, setMcPaths]           = useState<number[][]>([]);
   const [mcFinalValues, setMcFinalValues] = useState<number[]>([]);
   const [mcSimCount, setMcSimCount]     = useState(0);
   const [dates, setDates]               = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [chartTab, setChartTab] = useState<'equity' | 'returns'>('equity');
+  const [loading, setLoading]           = useState(false);
+  const [simStage, setSimStage]         = useState<number | null>(null);
+  const [chartTab, setChartTab]         = useState<'equity' | 'returns'>('equity');
+
+  // Abort controller ref — cancel in-progress run when a new one starts
+  const abortRef = useRef<AbortController | null>(null);
 
   const [form, setForm] = useState<Params>({
     ticker: 'AAPL',
@@ -62,48 +69,82 @@ export default function DashboardPage() {
     setForm(prev => ({ ...prev, [key]: value }));
   };
 
+  const applyMcResult = useCallback((result: any) => {
+    setMcPaths(result.paths         ?? []);
+    setMcFinalValues(result.final_values ?? []);
+    setMcSimCount(result.simulation_count ?? 0);
+    setSimulations(result.monte_carlo ?? []);
+    setMetrics(prev => ({
+      ...prev,
+      var_95: result.var_95 ?? prev.var_95,
+      var_99: result.var_99 ?? prev.var_99,
+    }));
+  }, []);
+
   const handleRun = async (params: Params) => {
+    // Cancel any previous in-progress run
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const sig = controller.signal;
+
     setLoading(true);
+    setSimStage(100);
+
+    // ── Stage 1: full backtest + 100 MC sims ──────────────────
     try {
-      const result = await runBacktest(params);
+      const result = await runBacktest(params, sig);
+      if (sig.aborted) return;
 
-      const rawEquity: number[] = result.equity_curve || [];
-      const rawDates: string[] = result.dates || [];
-
-      const equityData = rawEquity.map((v: number, i: number) => ({
-        date: rawDates[i] ?? '',
-        value: Math.round(v),
-      }));
-
-      const returnsData = rawEquity.map((v: number, i: number) => ({
-        date: rawDates[i] ?? '',
-        value: i === 0 ? 0 : parseFloat(
-          (((v - rawEquity[i - 1]) / rawEquity[i - 1]) * 100).toFixed(4)
-        ),
-      }));
+      const rawEquity: number[] = result.equity_curve ?? [];
+      const rawDates:  string[] = result.dates         ?? [];
 
       setMetrics({
         portfolio_value: rawEquity[rawEquity.length - 1] ?? 0,
-        total_return: result.total_return ?? 0,
-        sharpe: result.sharpe ?? 0,
-        drawdown: result.drawdown ?? 0,
-        var_95: result.var_95 ?? 0,
-        var_99: result.var_99 ?? 0,
+        total_return:    result.total_return ?? 0,
+        sharpe:          result.sharpe       ?? 0,
+        drawdown:        result.drawdown     ?? 0,
+        var_95:          result.var_95       ?? 0,
+        var_99:          result.var_99       ?? 0,
       });
-      setEquityCurve(equityData);
-      setReturns(returnsData);
+      setEquityCurve(rawEquity.map((v, i) => ({ date: rawDates[i] ?? '', value: Math.round(v) })));
+      setReturns(rawEquity.map((v, i) => ({
+        date: rawDates[i] ?? '',
+        value: i === 0 ? 0 : parseFloat((((v - rawEquity[i - 1]) / rawEquity[i - 1]) * 100).toFixed(4)),
+      })));
       setDates(rawDates);
-      setSimulations(result.monte_carlo   || []);
-      setMcPaths(result.paths             || []);
-      setMcFinalValues(result.final_values || []);
-      setMcSimCount(result.simulation_count ?? 0);
+      applyMcResult(result);
     } catch (e: any) {
+      if (e?.name === 'AbortError') return;
       alert('Backtest failed: ' + (e?.message ?? 'Unknown error'));
+      setLoading(false);
+      setSimStage(null);
+      return;
     }
-    setLoading(false);
+
+    // ── Stages 2–4: progressive MC refinement ─────────────────
+    for (const n of MC_STAGES) {
+      if (sig.aborted) break;
+      setSimStage(n);
+      try {
+        const result = await runSimulate(params, n, sig);
+        if (!sig.aborted) applyMcResult(result);
+      } catch (e: any) {
+        if (e?.name === 'AbortError') break;
+        // non-fatal: stop further stages but don't alert
+        console.error(`MC stage ${n} failed:`, e);
+        break;
+      }
+    }
+
+    if (!sig.aborted) {
+      setLoading(false);
+      setSimStage(null);
+    }
   };
 
   const handleReset = () => {
+    abortRef.current?.abort();
     setMetrics(defaultMetrics);
     setEquityCurve([]);
     setReturns([]);
@@ -112,15 +153,23 @@ export default function DashboardPage() {
     setMcFinalValues([]);
     setMcSimCount(0);
     setDates([]);
+    setLoading(false);
+    setSimStage(null);
   };
 
-  const chartData = chartTab === 'equity' ? equityCurve : returns;
+  const chartData  = chartTab === 'equity' ? equityCurve : returns;
   const chartColor = chartTab === 'equity' ? '#f7931a' : '#26d9c0';
-  const hasData = metrics.portfolio_value > 0;
+  const hasData    = metrics.portfolio_value > 0;
+
+  // Stage label shown in epoch bar
+  const stageLabel = simStage !== null
+    ? `Simulating… ${simStage.toLocaleString()} paths`
+    : dates.length > 0
+      ? `${dates.length} trading days · ${mcSimCount.toLocaleString()} sims`
+      : 'Ready to run';
 
   return (
     <div className="app-root">
-      {/* Navbar */}
       <Sidebar
         ticker={form.ticker}
         portfolioValue={metrics.portfolio_value}
@@ -128,14 +177,12 @@ export default function DashboardPage() {
         loading={loading}
       />
 
-      {/* Stats bar */}
-      <MetricsBar metrics={metrics} simCount={simulations.length} />
+      <MetricsBar metrics={metrics} simCount={mcSimCount} />
 
-      {/* Main content */}
       <div className="main-content">
         <div className="left-content">
 
-          {/* Current Backtest info bar */}
+          {/* Backtest info bar */}
           <div className="epoch-bar">
             <div>
               <div className="epoch-heading">monteCore</div>
@@ -154,34 +201,26 @@ export default function DashboardPage() {
                 </div>
               )}
               <div className="progress-bar-bg">
-                <div
-                  className="progress-bar-fill"
-                  style={{ width: dates.length > 0 ? '100%' : '0%' }}
-                />
+                <div className="progress-bar-fill" style={{ width: dates.length > 0 ? '100%' : '0%' }} />
               </div>
             </div>
             <div className="epoch-right-info">
-              {dates.length > 0
-                ? `${dates.length} trading days analyzed`
-                : 'Ready to run'}
+              {loading && simStage !== null && (
+                <span className="sim-stage-pulse" />
+              )}
+              {stageLabel}
             </div>
           </div>
 
-          {/* Chart section */}
+          {/* Equity curve / Returns chart */}
           <div className="chart-section">
             <div className="chart-header">
               <div className="chart-header-left">
                 <div className="chart-tabs">
-                  <div
-                    className={`chart-tab ${chartTab === 'equity' ? 'active' : ''}`}
-                    onClick={() => setChartTab('equity')}
-                  >
+                  <div className={`chart-tab ${chartTab === 'equity' ? 'active' : ''}`} onClick={() => setChartTab('equity')}>
                     Equity Curve
                   </div>
-                  <div
-                    className={`chart-tab ${chartTab === 'returns' ? 'active' : ''}`}
-                    onClick={() => setChartTab('returns')}
-                  >
+                  <div className={`chart-tab ${chartTab === 'returns' ? 'active' : ''}`} onClick={() => setChartTab('returns')}>
                     Returns
                   </div>
                 </div>
@@ -200,15 +239,17 @@ export default function DashboardPage() {
             <ChartCard title="" data={chartData} color={chartColor} />
           </div>
 
-          {/* Monte Carlo big chart */}
+          {/* Monte Carlo multi-path + histogram chart */}
           <MonteCarloChart
             paths={mcPaths}
             finalValues={mcFinalValues}
             simulationCount={mcSimCount}
             initialValue={10000}
+            isLoading={loading && simStage !== null}
+            simStage={simStage}
           />
 
-          {/* Monte Carlo scenario cards */}
+          {/* Scenario cards (Optimistic / Median / Conservative) */}
           <MonteCarloPanel
             simulations={simulations}
             onRun={() => handleRun(form)}
@@ -218,7 +259,6 @@ export default function DashboardPage() {
 
         </div>
 
-        {/* Right panel */}
         <ControlPanel
           ticker={form.ticker}
           strategy={form.strategy}

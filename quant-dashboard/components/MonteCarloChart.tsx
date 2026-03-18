@@ -10,6 +10,8 @@ type Props = {
   finalValues: number[];
   simulationCount: number;
   initialValue?: number;
+  isLoading?: boolean;
+  simStage?: number | null;
 };
 
 // ── Helpers ────────────────────────────────────────────────
@@ -153,11 +155,15 @@ function HistogramTooltip({ active, payload }: any) {
 
 // ── Main Component ──────────────────────────────────────────
 
+const STAGES = [100, 500, 1000, 5000];
+
 export default function MonteCarloChart({
   paths,
   finalValues,
   simulationCount,
   initialValue = 10000,
+  isLoading = false,
+  simStage = null,
 }: Props) {
   const [tab, setTab] = useState<'paths' | 'distribution'>('paths');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -196,12 +202,27 @@ export default function MonteCarloChart({
       <div className="mc-chart-header">
         <div>
           <div className="mc-chart-title">Monte Carlo Simulation</div>
-          {!isEmpty && (
+          {(!isEmpty || isLoading) && (
             <div className="mc-chart-subtitle">
-              {simulationCount.toLocaleString()} paths · 252-day horizon
+              {isLoading && simStage !== null
+                ? `Simulating ${simStage.toLocaleString()} paths…`
+                : `${simulationCount.toLocaleString()} paths · 252-day horizon`}
             </div>
           )}
         </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {/* Stage progress dots */}
+          <div className="mc-stage-dots">
+            {STAGES.map(s => {
+              const done    = simulationCount >= s;
+              const active  = isLoading && simStage === s;
+              return (
+                <div key={s} className={`mc-stage-dot ${done ? 'done' : ''} ${active ? 'active' : ''}`}>
+                  <span>{s >= 1000 ? `${s / 1000}k` : s}</span>
+                </div>
+              );
+            })}
+          </div>
         <div className="chart-tabs">
           <div
             className={`chart-tab ${tab === 'paths' ? 'active' : ''}`}
@@ -215,6 +236,7 @@ export default function MonteCarloChart({
           >
             Distribution
           </div>
+        </div>
         </div>
       </div>
 

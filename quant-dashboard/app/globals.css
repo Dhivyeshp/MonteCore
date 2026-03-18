@@ -970,3 +970,55 @@ body {
   font-size: 0.86rem;
   font-weight: 500;
 }
+
+/* ── Stage progress dots ── */
+.mc-stage-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mc-stage-dot {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 3px 7px;
+  border-radius: 20px;
+  border: 1px solid var(--border-soft);
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.mc-stage-dot.done {
+  color: var(--teal);
+  border-color: rgba(41, 223, 196, 0.3);
+  background: rgba(41, 223, 196, 0.07);
+}
+
+.mc-stage-dot.active {
+  color: var(--orange);
+  border-color: rgba(247, 147, 26, 0.4);
+  background: rgba(247, 147, 26, 0.08);
+  animation: stage-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes stage-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+/* ── Epoch bar pulse dot ── */
+.sim-stage-pulse {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--orange);
+  margin-right: 6px;
+  vertical-align: middle;
+  animation: stage-pulse 1.2s ease-in-out infinite;
+  box-shadow: 0 0 6px rgba(247, 147, 26, 0.6);
+}
