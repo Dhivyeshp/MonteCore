@@ -881,3 +881,92 @@ body {
   font-family: inherit;
 }
 .reset-btn:hover { background: rgba(127,92,255,0.28); }
+
+/* ══════════════════════════════════════
+   MONTE CARLO CHART CARD
+══════════════════════════════════════ */
+.mc-chart-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  backdrop-filter: blur(10px);
+}
+
+.mc-chart-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mc-chart-title {
+  font-size: 0.93rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.005em;
+}
+
+.mc-chart-subtitle {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 3px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.mc-stats-row {
+  display: flex;
+  gap: 28px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-soft);
+}
+
+.mc-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.mc-stat-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.mc-stat-val {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.015em;
+}
+
+.mc-stat-val.teal { color: var(--teal); }
+.mc-stat-val.red  { color: var(--red); }
+
+.mc-chart-area {
+  width: 100%;
+  height: 300px;
+  position: relative;
+}
+
+.mc-chart-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  font-weight: 500;
+}

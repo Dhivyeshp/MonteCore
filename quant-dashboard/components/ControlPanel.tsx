@@ -6,6 +6,8 @@ type Params = {
   shortWindow: number;
   longWindow: number;
   simulations: number;
+  commission: number;
+  slippage: number;
 };
 
 type Metrics = {
@@ -21,6 +23,8 @@ type RightPanelProps = {
   shortWindow: number;
   longWindow: number;
   simulations: number;
+  commission: number;
+  slippage: number;
   onChange: (key: keyof Params, value: any) => void;
   onRun: () => void;
   onReset: () => void;
@@ -36,6 +40,8 @@ const ControlPanel: React.FC<RightPanelProps> = ({
   shortWindow,
   longWindow,
   simulations,
+  commission,
+  slippage,
   onChange,
   onRun,
   onReset,
@@ -156,17 +162,51 @@ const ControlPanel: React.FC<RightPanelProps> = ({
           {/* Long window */}
           <div className="panel-info-row">
             <span>Long Window (SMA)</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input
-                type="number"
-                className="panel-input"
-                style={{ width: 64, padding: '5px 8px', fontSize: '0.82rem' }}
-                value={longWindow}
-                min={shortWindow + 1}
-                max={200}
-                onChange={e => onChange('longWindow', Number(e.target.value))}
-              />
-            </div>
+            <input
+              type="number"
+              className="panel-input"
+              style={{ width: 64, padding: '5px 8px', fontSize: '0.82rem' }}
+              value={longWindow}
+              min={shortWindow + 1}
+              max={200}
+              onChange={e => onChange('longWindow', Number(e.target.value))}
+            />
+          </div>
+
+          {/* Commission */}
+          <div className="panel-info-row">
+            <span>Commission</span>
+            <input
+              type="number"
+              className="panel-input"
+              style={{ width: 72, padding: '5px 8px', fontSize: '0.82rem' }}
+              value={commission}
+              min={0}
+              max={0.05}
+              step={0.0005}
+              onChange={e => onChange('commission', Number(e.target.value))}
+            />
+          </div>
+          <div className="panel-info-row" style={{ marginTop: -8 }}>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>per trade, e.g. 0.001 = 0.1%</span>
+          </div>
+
+          {/* Slippage */}
+          <div className="panel-info-row">
+            <span>Slippage</span>
+            <input
+              type="number"
+              className="panel-input"
+              style={{ width: 72, padding: '5px 8px', fontSize: '0.82rem' }}
+              value={slippage}
+              min={0}
+              max={0.05}
+              step={0.0005}
+              onChange={e => onChange('slippage', Number(e.target.value))}
+            />
+          </div>
+          <div className="panel-info-row" style={{ marginTop: -8 }}>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>price impact, e.g. 0.0005 = 0.05%</span>
           </div>
 
           <div className="panel-divider" />

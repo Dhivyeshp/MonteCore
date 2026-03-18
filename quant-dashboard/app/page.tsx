@@ -1,10 +1,11 @@
 "use client";
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import MetricsBar from '../components/MetricsBar';
 import ControlPanel from '../components/ControlPanel';
 import ChartCard from '../components/ChartCard';
 import MonteCarloPanel from '../components/MonteCarloPanel';
+import MonteCarloChart from '../components/MonteCarloChart';
 import { runBacktest } from '../lib/api';
 
 type Metrics = {
@@ -12,6 +13,8 @@ type Metrics = {
   total_return: number;
   sharpe: number;
   drawdown: number;
+  var_95: number;
+  var_99: number;
 };
 
 const defaultMetrics: Metrics = {
@@ -19,6 +22,8 @@ const defaultMetrics: Metrics = {
   total_return: 0,
   sharpe: 0,
   drawdown: 0,
+  var_95: 0,
+  var_99: 0,
 };
 
 type Params = {
@@ -27,14 +32,19 @@ type Params = {
   shortWindow: number;
   longWindow: number;
   simulations: number;
+  commission: number;
+  slippage: number;
 };
 
 export default function DashboardPage() {
   const [metrics, setMetrics] = useState<Metrics>(defaultMetrics);
   const [equityCurve, setEquityCurve] = useState<{ date: string; value: number }[]>([]);
   const [returns, setReturns] = useState<{ date: string; value: number }[]>([]);
-  const [simulations, setSimulations] = useState<any[]>([]);
-  const [dates, setDates] = useState<string[]>([]);
+  const [simulations, setSimulations]   = useState<any[]>([]);
+  const [mcPaths, setMcPaths]           = useState<number[][]>([]);
+  const [mcFinalValues, setMcFinalValues] = useState<number[]>([]);
+  const [mcSimCount, setMcSimCount]     = useState(0);
+  const [dates, setDates]               = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [chartTab, setChartTab] = useState<'equity' | 'returns'>('equity');
 
@@ -44,6 +54,8 @@ export default function DashboardPage() {
     shortWindow: 20,
     longWindow: 50,
     simulations: 1000,
+    commission: 0.001,
+    slippage: 0.0005,
   });
 
   const handleChange = (key: keyof Params, value: any) => {
@@ -75,11 +87,16 @@ export default function DashboardPage() {
         total_return: result.total_return ?? 0,
         sharpe: result.sharpe ?? 0,
         drawdown: result.drawdown ?? 0,
+        var_95: result.var_95 ?? 0,
+        var_99: result.var_99 ?? 0,
       });
       setEquityCurve(equityData);
       setReturns(returnsData);
       setDates(rawDates);
-      setSimulations(result.monte_carlo || []);
+      setSimulations(result.monte_carlo   || []);
+      setMcPaths(result.paths             || []);
+      setMcFinalValues(result.final_values || []);
+      setMcSimCount(result.simulation_count ?? 0);
     } catch (e: any) {
       alert('Backtest failed: ' + (e?.message ?? 'Unknown error'));
     }
@@ -91,6 +108,9 @@ export default function DashboardPage() {
     setEquityCurve([]);
     setReturns([]);
     setSimulations([]);
+    setMcPaths([]);
+    setMcFinalValues([]);
+    setMcSimCount(0);
     setDates([]);
   };
 
@@ -180,7 +200,15 @@ export default function DashboardPage() {
             <ChartCard title="" data={chartData} color={chartColor} />
           </div>
 
-          {/* Monte Carlo simulation cards */}
+          {/* Monte Carlo big chart */}
+          <MonteCarloChart
+            paths={mcPaths}
+            finalValues={mcFinalValues}
+            simulationCount={mcSimCount}
+            initialValue={10000}
+          />
+
+          {/* Monte Carlo scenario cards */}
           <MonteCarloPanel
             simulations={simulations}
             onRun={() => handleRun(form)}
@@ -197,6 +225,8 @@ export default function DashboardPage() {
           shortWindow={form.shortWindow}
           longWindow={form.longWindow}
           simulations={form.simulations}
+          commission={form.commission}
+          slippage={form.slippage}
           onChange={handleChange}
           onRun={() => handleRun(form)}
           onReset={handleReset}

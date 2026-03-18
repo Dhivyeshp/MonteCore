@@ -5,6 +5,8 @@ type Metrics = {
   total_return: number;
   sharpe: number;
   drawdown: number;
+  var_95: number;
+  var_99: number;
 };
 
 type StatsBarProps = {
@@ -38,6 +40,18 @@ const MetricsBar: React.FC<StatsBarProps> = ({ metrics, simCount }) => {
         <div className="stat-label">Max Drawdown</div>
         <div className={`stat-value ${hasData ? 'red' : 'dim'}`}>
           {hasData ? `${(metrics.drawdown * 100).toFixed(2)}%` : '--'}
+        </div>
+      </div>
+      <div className="stat-item">
+        <div className="stat-label">VaR 95%</div>
+        <div className={`stat-value ${hasData ? 'red' : 'dim'}`}>
+          {hasData ? `$${metrics.var_95.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '--'}
+        </div>
+      </div>
+      <div className="stat-item">
+        <div className="stat-label">VaR 99%</div>
+        <div className={`stat-value ${hasData ? 'red' : 'dim'}`}>
+          {hasData ? `$${metrics.var_99.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '--'}
         </div>
       </div>
       <div className="stat-item">
