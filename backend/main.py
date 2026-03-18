@@ -1,4 +1,3 @@
-import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -12,13 +11,10 @@ from monte_carlo.simulator import run_simulation
 
 app = FastAPI()
 
-_origins_env = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
-_origins = [o.strip() for o in _origins_env.split(",")]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_origins,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -74,6 +70,10 @@ def _build_mc_payload(sim_df: pd.DataFrame, initial_value: float, n_sim: int) ->
     }
 
 # ── /backtest ─────────────────────────────────────────────────────────────────
+
+@app.get("/")
+def health_check():
+    return {"status": "ok"}
 
 @app.post("/backtest")
 def backtest(req: BacktestRequest):
