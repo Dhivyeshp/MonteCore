@@ -1,8 +1,20 @@
-interface BacktestParams {
+export interface BacktestParams {
   ticker: string;
   strategy: string;
+  // SMA
   shortWindow: number;
   longWindow: number;
+  // RSI
+  rsiPeriod: number;
+  rsiOversold: number;
+  rsiOverbought: number;
+  // Bollinger Bands
+  bbWindow: number;
+  bbNumStd: number;
+  // Mean Reversion
+  mrWindow: number;
+  mrZThreshold: number;
+  // Common
   simulations: number;
   commission: number;
   slippage: number;
@@ -12,12 +24,20 @@ const API_URL = '/api';
 
 function buildBody(params: BacktestParams, nSims: number) {
   return JSON.stringify({
-    symbol:        params.ticker,
-    short_window:  params.shortWindow,
-    long_window:   params.longWindow,
-    n_simulations: nSims,
-    commission:    params.commission,
-    slippage:      params.slippage,
+    symbol:         params.ticker,
+    strategy:       params.strategy,
+    short_window:   params.shortWindow,
+    long_window:    params.longWindow,
+    rsi_period:     params.rsiPeriod,
+    rsi_oversold:   params.rsiOversold,
+    rsi_overbought: params.rsiOverbought,
+    bb_window:      params.bbWindow,
+    bb_num_std:     params.bbNumStd,
+    mr_window:      params.mrWindow,
+    mr_z_threshold: params.mrZThreshold,
+    n_simulations:  nSims,
+    commission:     params.commission,
+    slippage:       params.slippage,
   });
 }
 

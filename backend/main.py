@@ -1,10 +1,14 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import Optional
 import pandas as pd
 import numpy as np
 from data.data_loader import load_data
-from strategies.moving_average import generate_signals
+from strategies.moving_average import generate_signals as sma_signals
+from strategies.rsi import generate_signals as rsi_signals
+from strategies.bollinger_bands import generate_signals as bb_signals
+from strategies.mean_reversion import generate_signals as mr_signals
 from engine.backtester import run_backtest
 from metrics.performance import compute_sharpe, compute_drawdown, compute_total_return
 from monte_carlo.simulator import run_simulation
@@ -21,11 +25,38 @@ app.add_middleware(
 
 class BacktestRequest(BaseModel):
     symbol: str
-    short_window: int
-    long_window: int
+    strategy: str = "moving_average"
+    # SMA params
+    short_window: int = 20
+    long_window: int = 50
+    # RSI params
+    rsi_period: int = 14
+    rsi_oversold: float = 30
+    rsi_overbought: float = 70
+    # Bollinger Bands params
+    bb_window: int = 20
+    bb_num_std: float = 2.0
+    # Mean Reversion params
+    mr_window: int = 20
+    mr_z_threshold: float = 1.5
+    # Common
     n_simulations: int = 100
     commission: float = 0.001
     slippage: float = 0.0005
+
+
+def _apply_strategy(df: pd.DataFrame, req: BacktestRequest) -> pd.DataFrame:
+    if req.strategy == "rsi":
+        return rsi_signals(df, req.rsi_period, req.rsi_oversold, req.rsi_overbought)
+    elif req.strategy == "bollinger_bands":
+        return bb_signals(df, req.bb_window, req.bb_num_std)
+    elif req.strategy == "mean_reversion":
+        return mr_signals(df, req.mr_window, req.mr_z_threshold)
+    elif req.strategy == "moving_average":
+        return sma_signals(df, req.short_window, req.long_window)
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown strategy: {req.strategy}")
+
 
 # ── Shared helper ─────────────────────────────────────────────────────────────
 
@@ -78,7 +109,7 @@ def health_check():
 @app.post("/backtest")
 def backtest(req: BacktestRequest):
     df = load_data(req.symbol)
-    df = generate_signals(df, req.short_window, req.long_window)
+    df = _apply_strategy(df, req)
     df = run_backtest(df, commission=req.commission, slippage=req.slippage)
 
     returns_series = df['Strategy_Return']
@@ -104,7 +135,7 @@ def backtest(req: BacktestRequest):
 def simulate(req: BacktestRequest):
     """Progressive MC update — runs backtest to get returns then re-runs MC only."""
     df = load_data(req.symbol)
-    df = generate_signals(df, req.short_window, req.long_window)
+    df = _apply_strategy(df, req)
     df = run_backtest(df, commission=req.commission, slippage=req.slippage)
 
     returns_series = df['Strategy_Return']

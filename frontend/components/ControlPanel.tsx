@@ -1,14 +1,5 @@
 import React, { useState } from 'react';
-
-type Params = {
-  ticker: string;
-  strategy: string;
-  shortWindow: number;
-  longWindow: number;
-  simulations: number;
-  commission: number;
-  slippage: number;
-};
+import { type BacktestParams } from '../lib/api';
 
 type Metrics = {
   portfolio_value: number;
@@ -22,10 +13,17 @@ type RightPanelProps = {
   strategy: string;
   shortWindow: number;
   longWindow: number;
+  rsiPeriod: number;
+  rsiOversold: number;
+  rsiOverbought: number;
+  bbWindow: number;
+  bbNumStd: number;
+  mrWindow: number;
+  mrZThreshold: number;
   simulations: number;
   commission: number;
   slippage: number;
-  onChange: (key: keyof Params, value: any) => void;
+  onChange: (key: keyof BacktestParams, value: any) => void;
   onRun: () => void;
   onReset: () => void;
   loading?: boolean;
@@ -34,11 +32,25 @@ type RightPanelProps = {
 
 const SIM_STEPS = [100, 500, 1000, 2000, 5000];
 
+const STRATEGY_LABELS: Record<string, string> = {
+  moving_average: 'Moving Average',
+  rsi: 'RSI',
+  bollinger_bands: 'Bollinger Bands',
+  mean_reversion: 'Mean Reversion',
+};
+
 const ControlPanel: React.FC<RightPanelProps> = ({
   ticker,
   strategy,
   shortWindow,
   longWindow,
+  rsiPeriod,
+  rsiOversold,
+  rsiOverbought,
+  bbWindow,
+  bbNumStd,
+  mrWindow,
+  mrZThreshold,
   simulations,
   commission,
   slippage,
@@ -75,12 +87,12 @@ const ControlPanel: React.FC<RightPanelProps> = ({
       {/* Portfolio stats */}
       <div className="panel-stats">
         <div className="panel-stat">
-          <div className="panel-stat-label">Short Window</div>
-          <div className="panel-stat-value">{shortWindow} days</div>
+          <div className="panel-stat-label">Strategy</div>
+          <div className="panel-stat-value">{STRATEGY_LABELS[strategy] ?? strategy}</div>
         </div>
         <div className="panel-stat">
-          <div className="panel-stat-label">Long Window</div>
-          <div className="panel-stat-value teal">{longWindow} days</div>
+          <div className="panel-stat-label">Ticker</div>
+          <div className="panel-stat-value teal">{ticker}</div>
         </div>
       </div>
 
@@ -89,9 +101,7 @@ const ControlPanel: React.FC<RightPanelProps> = ({
       {/* Available */}
       <div className="panel-available">
         <span>Strategy</span>
-        <span className="panel-available-val">
-          {strategy === 'moving_average' ? 'Moving Average' : strategy}
-        </span>
+        <span className="panel-available-val">{STRATEGY_LABELS[strategy] ?? strategy}</span>
       </div>
 
       {activeTab === 'run' ? (
@@ -121,6 +131,9 @@ const ControlPanel: React.FC<RightPanelProps> = ({
               onChange={e => onChange('strategy', e.target.value)}
             >
               <option value="moving_average">Moving Average</option>
+              <option value="rsi">RSI</option>
+              <option value="bollinger_bands">Bollinger Bands</option>
+              <option value="mean_reversion">Mean Reversion</option>
             </select>
           </div>
 
@@ -143,35 +156,139 @@ const ControlPanel: React.FC<RightPanelProps> = ({
             </div>
           </div>
 
-          {/* Short window */}
-          <div className="panel-info-row">
-            <span>Short Window (SMA)</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input
-                type="number"
-                className="panel-input"
-                style={{ width: 64, padding: '5px 8px', fontSize: '0.82rem' }}
-                value={shortWindow}
-                min={1}
-                max={longWindow - 1}
-                onChange={e => onChange('shortWindow', Number(e.target.value))}
-              />
-            </div>
-          </div>
+          {/* ── Strategy-specific params ── */}
 
-          {/* Long window */}
-          <div className="panel-info-row">
-            <span>Long Window (SMA)</span>
-            <input
-              type="number"
-              className="panel-input"
-              style={{ width: 64, padding: '5px 8px', fontSize: '0.82rem' }}
-              value={longWindow}
-              min={shortWindow + 1}
-              max={200}
-              onChange={e => onChange('longWindow', Number(e.target.value))}
-            />
-          </div>
+          {strategy === 'moving_average' && (
+            <>
+              <div className="panel-info-row">
+                <span>Short Window (SMA)</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="number"
+                    className="panel-input"
+                    style={{ width: 64, padding: '5px 8px', fontSize: '0.82rem' }}
+                    value={shortWindow}
+                    min={1}
+                    max={longWindow - 1}
+                    onChange={e => onChange('shortWindow', Number(e.target.value))}
+                  />
+                </div>
+              </div>
+              <div className="panel-info-row">
+                <span>Long Window (SMA)</span>
+                <input
+                  type="number"
+                  className="panel-input"
+                  style={{ width: 64, padding: '5px 8px', fontSize: '0.82rem' }}
+                  value={longWindow}
+                  min={shortWindow + 1}
+                  max={200}
+                  onChange={e => onChange('longWindow', Number(e.target.value))}
+                />
+              </div>
+            </>
+          )}
+
+          {strategy === 'rsi' && (
+            <>
+              <div className="panel-info-row">
+                <span>RSI Period</span>
+                <input
+                  type="number"
+                  className="panel-input"
+                  style={{ width: 64, padding: '5px 8px', fontSize: '0.82rem' }}
+                  value={rsiPeriod}
+                  min={2}
+                  max={50}
+                  onChange={e => onChange('rsiPeriod', Number(e.target.value))}
+                />
+              </div>
+              <div className="panel-info-row">
+                <span>Oversold (buy &lt;)</span>
+                <input
+                  type="number"
+                  className="panel-input"
+                  style={{ width: 64, padding: '5px 8px', fontSize: '0.82rem' }}
+                  value={rsiOversold}
+                  min={10}
+                  max={45}
+                  onChange={e => onChange('rsiOversold', Number(e.target.value))}
+                />
+              </div>
+              <div className="panel-info-row">
+                <span>Overbought (sell &gt;)</span>
+                <input
+                  type="number"
+                  className="panel-input"
+                  style={{ width: 64, padding: '5px 8px', fontSize: '0.82rem' }}
+                  value={rsiOverbought}
+                  min={55}
+                  max={90}
+                  onChange={e => onChange('rsiOverbought', Number(e.target.value))}
+                />
+              </div>
+            </>
+          )}
+
+          {strategy === 'bollinger_bands' && (
+            <>
+              <div className="panel-info-row">
+                <span>BB Window</span>
+                <input
+                  type="number"
+                  className="panel-input"
+                  style={{ width: 64, padding: '5px 8px', fontSize: '0.82rem' }}
+                  value={bbWindow}
+                  min={5}
+                  max={100}
+                  onChange={e => onChange('bbWindow', Number(e.target.value))}
+                />
+              </div>
+              <div className="panel-info-row">
+                <span>Std Deviations</span>
+                <input
+                  type="number"
+                  className="panel-input"
+                  style={{ width: 64, padding: '5px 8px', fontSize: '0.82rem' }}
+                  value={bbNumStd}
+                  min={0.5}
+                  max={4}
+                  step={0.1}
+                  onChange={e => onChange('bbNumStd', Number(e.target.value))}
+                />
+              </div>
+            </>
+          )}
+
+          {strategy === 'mean_reversion' && (
+            <>
+              <div className="panel-info-row">
+                <span>Rolling Window</span>
+                <input
+                  type="number"
+                  className="panel-input"
+                  style={{ width: 64, padding: '5px 8px', fontSize: '0.82rem' }}
+                  value={mrWindow}
+                  min={5}
+                  max={100}
+                  onChange={e => onChange('mrWindow', Number(e.target.value))}
+                />
+              </div>
+              <div className="panel-info-row">
+                <span>Z-Score Threshold</span>
+                <input
+                  type="number"
+                  className="panel-input"
+                  style={{ width: 64, padding: '5px 8px', fontSize: '0.82rem' }}
+                  value={mrZThreshold}
+                  min={0.5}
+                  max={4}
+                  step={0.1}
+                  onChange={e => onChange('mrZThreshold', Number(e.target.value))}
+                />
+              </div>
+            </>
+          )}
 
           {/* Commission */}
           <div className="panel-info-row">
@@ -271,15 +388,13 @@ const ControlPanel: React.FC<RightPanelProps> = ({
             </div>
           </div>
           <p className="panel-description">
-            This quantitative trading platform backtests moving average crossover strategies
-            on historical equity data. It performs Monte Carlo simulations to model risk
-            and uncertainty, and accrues performance metrics including Sharpe ratio and
-            maximum drawdown.
+            This quantitative trading platform backtests strategies on historical equity data
+            and runs Monte Carlo simulations to model risk and uncertainty.
             <br /><br />
-            The platform uses the following strategies as components:
+            Available strategies:
           </p>
           <div className="panel-contract">
-            strategy::moving_average_crossover v1.0 · bootstrap_mc_simulation v1.0
+            strategy::moving_average_crossover v1.0 · rsi v1.0 · bollinger_bands v1.0 · mean_reversion v1.0
           </div>
         </>
       ) : (

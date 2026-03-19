@@ -6,7 +6,7 @@ import ControlPanel from '../components/ControlPanel';
 import ChartCard from '../components/ChartCard';
 import MonteCarloPanel from '../components/MonteCarloPanel';
 import MonteCarloChart from '../components/MonteCarloChart';
-import { runBacktest, runSimulate } from '../lib/api';
+import { runBacktest, runSimulate, type BacktestParams } from '../lib/api';
 
 // Stages: 100 → 500 → 1000 → 5000
 const MC_STAGES = [500, 1000, 5000] as const;
@@ -29,15 +29,7 @@ const defaultMetrics: Metrics = {
   var_99: 0,
 };
 
-type Params = {
-  ticker: string;
-  strategy: string;
-  shortWindow: number;
-  longWindow: number;
-  simulations: number;
-  commission: number;
-  slippage: number;
-};
+type Params = BacktestParams;
 
 export default function DashboardPage() {
   const [metrics, setMetrics]           = useState<Metrics>(defaultMetrics);
@@ -60,6 +52,13 @@ export default function DashboardPage() {
     strategy: 'moving_average',
     shortWindow: 20,
     longWindow: 50,
+    rsiPeriod: 14,
+    rsiOversold: 30,
+    rsiOverbought: 70,
+    bbWindow: 20,
+    bbNumStd: 2.0,
+    mrWindow: 20,
+    mrZThreshold: 1.5,
     simulations: 1000,
     commission: 0.001,
     slippage: 0.0005,
@@ -122,8 +121,8 @@ export default function DashboardPage() {
       return;
     }
 
-    // ── Stages 2–4: progressive MC refinement ─────────────────
-    for (const n of MC_STAGES) {
+    // ── Stages 2–4: progressive MC refinement (capped by params.simulations) ──
+    for (const n of MC_STAGES.filter(n => n <= params.simulations)) {
       if (sig.aborted) break;
       setSimStage(n);
       try {
@@ -190,7 +189,13 @@ export default function DashboardPage() {
             <div className="epoch-block">
               <div className="epoch-sub-label">Current Backtest</div>
               <div className="epoch-name">
-                {form.ticker} — {form.strategy === 'moving_average' ? 'Moving Average' : form.strategy}
+                {form.ticker} — {
+                form.strategy === 'moving_average' ? 'Moving Average' :
+                form.strategy === 'rsi' ? 'RSI' :
+                form.strategy === 'bollinger_bands' ? 'Bollinger Bands' :
+                form.strategy === 'mean_reversion' ? 'Mean Reversion' :
+                form.strategy
+              }
               </div>
             </div>
             <div className="epoch-progress-wrap">
@@ -264,6 +269,13 @@ export default function DashboardPage() {
           strategy={form.strategy}
           shortWindow={form.shortWindow}
           longWindow={form.longWindow}
+          rsiPeriod={form.rsiPeriod}
+          rsiOversold={form.rsiOversold}
+          rsiOverbought={form.rsiOverbought}
+          bbWindow={form.bbWindow}
+          bbNumStd={form.bbNumStd}
+          mrWindow={form.mrWindow}
+          mrZThreshold={form.mrZThreshold}
           simulations={form.simulations}
           commission={form.commission}
           slippage={form.slippage}
